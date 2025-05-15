@@ -1,6 +1,7 @@
 import cvxpy as cp
 import numpy as np
 from scipy.stats import chi2
+from scipy.stats import norm
 
 def MVO(mu, Q):
     """
@@ -61,20 +62,24 @@ def risk_parity(Q, c=1.0, solver=cp.SCS):
 
 
 
-def robust_MVO_ellip(mu, Q, T,
-                     alpha):
+def robust_MVO_box(mu, Q, T,
+                   alpha=0.95,
+                   targetRet=None,
+                   solver=cp.SCS):
     """
-    Robust MVO under ellipsoidal uncertainty in mu:
-      min_x x' Q x
-      s.t. mu' x - eps2 * || sqrt(diag(Q)/T) * x ||_2 >= targetRet
-           sum(x) == 1, x >= 0
+    Robust MVO under *box* uncertainty in mu:
+        min_x  x' Q x
+        s.t.   mu' x  -  delta' |x|  >= targetRet
+               sum(x)==1, x>=0
+
+    where delta_i = z_{alpha} * sqrt(Q_{ii}/T)
 
     Args:
-      mu        : (n,1) or (n,) vector of expected returns
+      mu        : (n,) or (n,1) array of expected returns
       Q         : (n,n) covariance matrix
-      T         : # observations used to estimate mu (for SE)
-      targetRet : scalar, required return R; default = mean(mu)
-      alpha     : confidence level for chi2 bound (ε2^2 = χ2_n(α))
+      T         : # observations used to estimate standard errors
+      alpha     : confidence level (so z_alpha = norm.ppf(alpha))
+      targetRet : required return (defaults to mean(mu))
       solver    : CVXPY solver to use
 
     Returns:
@@ -83,83 +88,42 @@ def robust_MVO_ellip(mu, Q, T,
     mu = mu.flatten()
     n  = len(mu)
 
-    # default target = average expected return
-    
-    targetRet = float(mu.mean())
+    # 1) default target = average expected return
+    if targetRet is None:
+        targetRet = float(mu.mean())
 
-    # construct Θ^(1/2) diagonal-vector
-    theta_half = np.sqrt(np.diag(Q) / T)
+    # 2) compute per‐asset standard errors sqrt(Q_ii / T)
+    theta_half = np.sqrt(np.diag(Q) / float(T))
 
-    # compute eps2 = sqrt(chi2.ppf(alpha, df=n))
-    eps2 = np.sqrt(chi2.ppf(alpha, df=n))
-    # print(eps2)
-    # decision variable
+    # 3) box‐uncertainty radius: z‐score for N(0,1)
+    z_alpha = norm.ppf(alpha)
+
+    # 4) build delta vector
+    delta = z_alpha * theta_half   # shape (n,)
+
+    # 5) decision variable
     x = cp.Variable(n)
-    # print(T, eps2, mu)
-    # constraints
+
+    # 6) constraints
     constraints = [
         mu @ x
-          - eps2* cp.norm(cp.multiply(theta_half, x), 2)
-              # || sqrt(diag(Q)/T) * x ||_2
+          - delta @ cp.abs(x)    # δᵀ|x|
           >= targetRet,
         cp.sum(x) == 1,
         x >= 0
     ]
 
-    # objective = x' Q x
-    prob = cp.Problem(cp.Minimize(cp.quad_form(x, Q)),
-                      constraints)
-    prob.solve(verbose=False)
+    # 7) objective + solve
+    prob = cp.Problem(cp.Minimize(cp.quad_form(x, Q)), constraints)
+    prob.solve(solver=solver, verbose=False)
 
-   
     print("Status:", prob.status)
-    # print(x.value)
+    if prob.status not in ("optimal", "optimal_inaccurate"):
+        raise ValueError(f"Robust box‐MVO infeasible (α={alpha:.2f}, R={targetRet:.6g})")
+
     return x.value
 
 
 
 
-# test the robust MVO with syntehtic data
 
-if __name__ == "__main__":
-    import pandas as pd
-    import numpy as np
-    from sklearn.datasets import make_regression
-    from estimators import OLS
-    set_seed = 42
-
-    # 1) Simulate synthetic returns
-    np.random.seed(42)
-    T = 120                   # e.g. 120 “days”
-    n_assets = 5
-
-    # create a covariance matrix: daily vol ~1%, correlations ~0.2
-    base_corr = 0.2
-    Sigma = np.full((n_assets, n_assets), base_corr)
-    np.fill_diagonal(Sigma, 1.0)
-    Sigma *= (0.01)**2        # scale to 1% vol
-
-    # set “true” expected returns ~ 0.05% per day
-    mu_true = np.array([0.0005, 0.0004, 0.0006, 0.00055, 0.00045])
-
-    # draw T multivariate‐normal returns
-    R = np.random.multivariate_normal(mu_true, Sigma, size=T)
-    periodReturns = pd.DataFrame(R, columns=[f"Asset{i+1}" for i in range(n_assets)])
-
-    # 2) Estimate sample mean & covariance
-    mu_est = periodReturns.mean(axis=0).values       # shape (5,)
-    Q_est  = periodReturns.cov().values             # shape (5×5)
-
-    # 3) Call your robust MVO
-    #    (ensure T is float or int; alpha is 95% conf.)
-
-    
-    Q = Q_est
-    # 4) enforce PD + symmetry on Q
-    Q = (Q + Q.T)/2
-
-    weights = robust_MVO_ellip(mu_est, Q_est, T=T, alpha=0.95)
-
-    print("Estimated μ:", np.round(mu_est, 6))
-    print("Weights:", np.round(weights, 4))
-    print("Sum of weights:", np.sum(weights))

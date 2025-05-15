@@ -13,10 +13,12 @@ def project_function(periodReturns, periodFactRet, X0=None):
     # Strategy = OLS_MVO()
     # Strategy = equal_weight()
     # Strategy = LASSO_MVO()
-    Strategy = RobustEllipMVO()
+    # Strategy = RobustBoxMVO()
     
-    # x = Strategy.execute_strategy(periodReturns, periodFactRet)
+   
     # Strategy = OLS_PCA_MVO()
+    # Strategy = EnsembleFactor_MVO()
+    Strategy = FactorRiskParity()
     x = Strategy.execute_strategy(periodReturns, periodFactRet)
 
    
