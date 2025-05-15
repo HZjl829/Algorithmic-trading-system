@@ -8,6 +8,21 @@ def project_function(periodReturns, periodFactRet, X0=None):
     :param periodFactRet:
     :return: the allocation as a vector
     """
-    Strategy = OLS_MVO()
+
+    
+    # Strategy = OLS_MVO()
+    # Strategy = equal_weight()
+    # Strategy = LASSO_MVO()
+    Strategy = RobustEllipMVO()
+    
+    # x = Strategy.execute_strategy(periodReturns, periodFactRet)
+    # Strategy = OLS_PCA_MVO()
     x = Strategy.execute_strategy(periodReturns, periodFactRet)
+
+   
+    
+
+
+
+    # x = equal_weight(periodReturns)
     return x
