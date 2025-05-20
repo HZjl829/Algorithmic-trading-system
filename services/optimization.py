@@ -5,17 +5,11 @@ from scipy.stats import norm
 
 def MVO(mu, Q):
     """
-    #---------------------------------------------------------------------- Use this function to construct an example of a MVO portfolio.
+    #---------------------------------------------------------------------- 
+    # Use this function to construct an example of a MVO portfolio.
     #
-    # An example of an MVO implementation is given below. You can use this
-    # version of MVO if you like, but feel free to modify this code as much
-    # as you need to. You can also change the inputs and outputs to suit
-    # your needs.
+    # An example of an MVO implementation is given below. 
 
-    # You may use quadprog, Gurobi, or any other optimizer you are familiar
-    # with. Just be sure to include comments in your code.
-
-    # *************** WRITE YOUR CODE HERE ***************
     #----------------------------------------------------------------------
     """
 

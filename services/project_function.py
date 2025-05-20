@@ -3,7 +3,6 @@ from services.strategies import *
 
 def project_function(periodReturns, periodFactRet, X0=None):
     """
-    Please feel free to modify this function as desired
     :param periodReturns:
     :param periodFactRet:
     :return: the allocation as a vector
